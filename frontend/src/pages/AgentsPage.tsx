@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, Trash2 } from 'lucide-react'
+import { Cpu, Pencil, Plus, Trash2 } from 'lucide-react'
 
 import { agentsApi, type Agent, type AgentCreate } from '../api/agents'
 import { providersApi } from '../api/providers'
+import { skillsApi } from '../api/skills'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
@@ -256,6 +257,94 @@ function EditAgentDialog({ agent }: { agent: Agent }) {
   )
 }
 
+// ── Manage skills dialog ──────────────────────────────────────────────────────
+
+function ManageSkillsDialog({ agent }: { agent: Agent }) {
+  const [open, setOpen] = useState(false)
+  const qc = useQueryClient()
+
+  const { data: allSkills = [] } = useQuery({
+    queryKey: ['skills'],
+    queryFn: () => skillsApi.list(),
+    enabled: open,
+  })
+
+  const { data: assignedSkills = [] } = useQuery({
+    queryKey: ['agent-skills', agent.id],
+    queryFn: () => agentsApi.listSkills(agent.id),
+    enabled: open,
+  })
+
+  const assignedIds = new Set(assignedSkills.map((s) => s.skill_id))
+
+  const assignMutation = useMutation({
+    mutationFn: (skill_id: string) => agentsApi.assignSkill(agent.id, skill_id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['agent-skills', agent.id] }),
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (skill_id: string) => agentsApi.removeSkill(agent.id, skill_id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['agent-skills', agent.id] }),
+  })
+
+  const toggle = (skill_id: string, assigned: boolean) => {
+    if (assigned) {
+      removeMutation.mutate(skill_id)
+    } else {
+      assignMutation.mutate(skill_id)
+    }
+  }
+
+  const isPending = assignMutation.isPending || removeMutation.isPending
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+          <Cpu className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Skills — {agent.name}</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-80 space-y-2 overflow-y-auto">
+          {allSkills.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              No skills available. Seed them by starting the server.
+            </p>
+          )}
+          {allSkills.map((skill) => {
+            const assigned = assignedIds.has(skill.id)
+            return (
+              <div
+                key={skill.id}
+                className={`flex items-center justify-between rounded-md border p-3 transition-colors ${
+                  assigned ? 'border-primary/40 bg-primary/5' : 'border-border'
+                }`}
+              >
+                <div>
+                  <p className="text-sm font-medium">{skill.display_name}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-1">{skill.description}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant={assigned ? 'destructive' : 'outline'}
+                  onClick={() => toggle(skill.id, assigned)}
+                  disabled={isPending}
+                  className="ml-3 shrink-0"
+                >
+                  {assigned ? 'Remove' : 'Add'}
+                </Button>
+              </div>
+            )
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function AgentsPage() {
   const qc = useQueryClient()
   const { data: agents = [], isLoading } = useQuery({
@@ -287,6 +376,7 @@ export function AgentsPage() {
               <div className="flex items-start justify-between">
                 <CardTitle className="text-base">{agent.name}</CardTitle>
                 <div className="flex items-center gap-1">
+                  <ManageSkillsDialog agent={agent} />
                   <EditAgentDialog agent={agent} />
                   <Button
                     variant="ghost"
