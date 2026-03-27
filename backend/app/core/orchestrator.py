@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 
 import structlog
 from sqlalchemy import select
@@ -105,7 +105,7 @@ class OrchestratorAgent:
 
             # ── Mark task as running ───────────────────────────────────────
             task.status = "running"
-            task.started_at = datetime.now(timezone.utc)
+            task.started_at = datetime.utcnow()
             await session.flush()
             await event_bus.publish(
                 "task.started",
@@ -298,7 +298,7 @@ class OrchestratorAgent:
             # ── Mark task completed ────────────────────────────────────────
             task.status = "completed"
             task.result = final_result
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = datetime.utcnow()
             await session.commit()
 
             await event_bus.publish(
