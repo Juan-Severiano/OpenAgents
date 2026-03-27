@@ -8,10 +8,10 @@ interface StatusBadgeProps {
 }
 
 const statusConfig: Record<AgentStatus, { label: string; className: string }> = {
-  idle: { label: 'Idle', className: 'bg-gray-500 text-white' },
-  busy: { label: 'Thinking', className: 'bg-blue-500 text-white animate-pulse' },
-  error: { label: 'Error', className: 'bg-red-500 text-white' },
-  disabled: { label: 'Disabled', className: 'bg-gray-700 text-gray-400' },
+  idle: { label: 'Idle', className: 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300' },
+  busy: { label: 'Thinking', className: 'bg-orange-100 text-orange-700 animate-pulse dark:bg-orange-900/40 dark:text-orange-300' },
+  error: { label: 'Error', className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+  disabled: { label: 'Disabled', className: 'bg-stone-100 text-stone-400 dark:bg-stone-800 dark:text-stone-500' },
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {

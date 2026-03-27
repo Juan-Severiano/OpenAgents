@@ -4,25 +4,50 @@
 
 @layer base {
   :root {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* Claude light — painel direito da screenshot: fundo branco limpo */
+    --background: 40 20% 98%;           /* #FAFAF8 quase branco */
+    --foreground: 25 12% 12%;           /* #201D1A near-black quente */
+    --card: 0 0% 100%;                  /* white */
+    --card-foreground: 25 12% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 25 12% 12%;
+    --primary: 18 58% 58%;              /* #D97757 terracota Claude */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 36 18% 93%;            /* warm gray claro */
+    --secondary-foreground: 25 12% 12%;
+    --muted: 36 18% 93%;
+    --muted-foreground: 25 8% 48%;
+    --accent: 36 18% 93%;
+    --accent-foreground: 25 12% 12%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 36 12% 89%;
+    --input: 36 12% 89%;
+    --ring: 18 58% 58%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    /* Claude dark — painel esquerdo da screenshot: quase preto com warmth */
+    --background: 30 7% 11%;            /* #1D1B19 */
+    --foreground: 36 18% 88%;           /* #E5DDD4 warm off-white */
+    --card: 30 7% 14%;                  /* #232120 ligeiramente mais claro */
+    --card-foreground: 36 18% 88%;
+    --popover: 30 7% 14%;
+    --popover-foreground: 36 18% 88%;
+    --primary: 18 58% 62%;              /* laranja terracota, levemente mais brilhante no escuro */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 7% 18%;             /* #2C2A28 */
+    --secondary-foreground: 36 18% 88%;
+    --muted: 30 7% 18%;
+    --muted-foreground: 30 7% 54%;      /* warm medium gray */
+    --accent: 30 7% 18%;
+    --accent-foreground: 36 18% 88%;
+    --destructive: 0 58% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 7% 21%;                /* #36332F */
+    --input: 30 7% 21%;
+    --ring: 18 58% 62%;
     --radius: 0.5rem;
   }
 }

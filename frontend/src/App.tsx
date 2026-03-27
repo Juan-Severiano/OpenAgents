@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { ThemeProvider } from './hooks/useTheme'
 import { Layout } from './components/layout/Layout'
 import { CanvasPage } from './pages/CanvasPage'
 import { AgentsPage } from './pages/AgentsPage'
@@ -10,6 +11,7 @@ import { SettingsPage } from './pages/SettingsPage'
 
 export default function App() {
   return (
+    <ThemeProvider>
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
@@ -24,5 +26,6 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </ThemeProvider>
   )
 }
