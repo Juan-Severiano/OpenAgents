@@ -1,26 +1,53 @@
 import { useCallback, useEffect } from 'react'
+import { useTheme } from '../../hooks/useTheme'
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
   useEdgesState,
   useNodesState,
+  type Edge,
   type Node,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 
 import { AgentNode } from './AgentNode'
-import { useCanvasStore } from '../../stores/canvasStore'
 import { useAgentStore } from '../../stores/agentStore'
-import { canvasWS } from '../../api/ws'
+import { canvasWS, type WSEvent } from '../../api/ws'
 
 const nodeTypes = { agentNode: AgentNode }
 
 export function AgentCanvas() {
+  const { resolvedTheme } = useTheme()
   const { agents, fetchAgents } = useAgentStore()
-  const { handleWSEvent } = useCanvasStore()
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
+
+  // Handle WS events directly against ReactFlow state
+  const handleWSEvent = useCallback(
+    (event: WSEvent) => {
+      if (event.type === 'agent.status_changed') {
+        const agentId = event.agent_id
+        const status = (event.payload as { to?: string }).to ?? 'idle'
+        if (!agentId) return
+        setNodes((prev) =>
+          prev.map((n) => (n.id === agentId ? { ...n, data: { ...n.data, status } } : n))
+        )
+      } else if (event.type === 'subtask.delegated') {
+        const { from_id, to_id } = event.payload as { from_id?: string; to_id?: string }
+        if (!from_id || !to_id) return
+        const newEdge: Edge = {
+          id: `${from_id}-${to_id}-${Date.now()}`,
+          source: from_id,
+          target: to_id,
+          animated: true,
+          style: { stroke: '#3b82f6' },
+        }
+        setEdges((prev) => [...prev, newEdge])
+      }
+    },
+    [setNodes, setEdges]
+  )
 
   useEffect(() => {
     void fetchAgents()
@@ -61,9 +88,15 @@ export function AgentCanvas() {
         fitView
         fitViewOptions={{ padding: 0.2 }}
       >
-        <Background color="#334155" gap={24} />
+        <Background
+          color={resolvedTheme === 'dark' ? '#2e2b27' : '#d6cfc6'}
+          gap={24}
+        />
         <Controls />
-        <MiniMap nodeColor="#334155" maskColor="rgb(15, 23, 42, 0.8)" />
+        <MiniMap
+          nodeColor={resolvedTheme === 'dark' ? '#3a3632' : '#c9c1b8'}
+          maskColor={resolvedTheme === 'dark' ? 'rgba(28,25,22,0.7)' : 'rgba(250,248,244,0.7)'}
+        />
       </ReactFlow>
     </div>
   )
