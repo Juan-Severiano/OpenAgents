@@ -79,3 +79,7 @@ export class WSClient {
 }
 
 export const canvasWS = new WSClient('/ws/canvas')
+
+export function createTaskSocket(taskId: string): WSClient {
+  return new WSClient(`/ws/task/${taskId}`)
+}
