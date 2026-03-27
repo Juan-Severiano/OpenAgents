@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { Bot, CheckSquare, Cpu, LayoutDashboard, Server, Settings, Wrench } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { ThemeToggle } from '../ui/theme-toggle'
 
 const navItems = [
   { to: '/canvas', icon: LayoutDashboard, label: 'Canvas' },
@@ -40,6 +41,9 @@ export function Sidebar() {
           ))}
         </ul>
       </nav>
+      <div className="flex h-12 items-center border-t border-border px-3">
+        <ThemeToggle />
+      </div>
     </aside>
   )
 }
