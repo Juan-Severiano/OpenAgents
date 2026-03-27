@@ -69,6 +69,12 @@ def create_app() -> FastAPI:
             await create_tables()
             log.info("app.startup.tables_created")
 
+        from app.database import AsyncSessionLocal
+        from app.skills.loader import seed_builtin_skills
+        async with AsyncSessionLocal() as db:
+            await seed_builtin_skills(db)
+            await db.commit()
+
     return app
 
 
