@@ -27,6 +27,12 @@ class SkillUpdate(BaseModel):
     is_public: bool | None = None
 
 
+class GitHubInstallRequest(BaseModel):
+    url: str
+    subdir: str = ""
+    token: str | None = None
+
+
 class SkillResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -40,6 +46,8 @@ class SkillResponse(BaseModel):
     output_schema: dict[str, Any] | None = None
     implementation: str | None = None
     http_config: dict[str, Any] | None = None
+    github_url: str | None = None
+    github_ref: str | None = None
     is_public: bool
     created_at: datetime
     updated_at: datetime

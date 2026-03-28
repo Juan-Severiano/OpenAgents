@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Cpu, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Cpu, Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 
 import { agentsApi, type Agent, type AgentCreate } from '../api/agents'
 import { providersApi } from '../api/providers'
 import { skillsApi } from '../api/skills'
+import { capabilitiesApi } from '../api/capabilities'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import {
@@ -333,6 +334,102 @@ function ManageSkillsDialog({ agent }: { agent: Agent }) {
   )
 }
 
+const typeAccent: Record<string, string> = {
+  reasoning: 'bg-violet-500/20 text-violet-400',
+  memory: 'bg-blue-500/20 text-blue-400',
+  output_format: 'bg-cyan-500/20 text-cyan-400',
+  perception: 'bg-green-500/20 text-green-400',
+  action: 'bg-orange-500/20 text-orange-400',
+}
+
+function ManageCapabilitiesDialog({ agent }: { agent: Agent }) {
+  const [open, setOpen] = useState(false)
+  const qc = useQueryClient()
+
+  const { data: allCaps = [] } = useQuery({
+    queryKey: ['capabilities'],
+    queryFn: () => capabilitiesApi.list(),
+    enabled: open,
+  })
+
+  const { data: assignedCaps = [] } = useQuery({
+    queryKey: ['agent-capabilities', agent.id],
+    queryFn: () => agentsApi.listCapabilities(agent.id),
+    enabled: open,
+  })
+
+  const assignedIds = new Set(assignedCaps.map((c) => c.capability_id))
+
+  const assignMutation = useMutation({
+    mutationFn: (capability_id: string) => agentsApi.assignCapability(agent.id, capability_id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['agent-capabilities', agent.id] }),
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (capability_id: string) => agentsApi.removeCapability(agent.id, capability_id),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['agent-capabilities', agent.id] }),
+  })
+
+  const toggle = (capability_id: string, assigned: boolean) => {
+    if (assigned) removeMutation.mutate(capability_id)
+    else assignMutation.mutate(capability_id)
+  }
+
+  const isPending = assignMutation.isPending || removeMutation.isPending
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+          <Sparkles className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Capabilities — {agent.name}</DialogTitle>
+        </DialogHeader>
+        <div className="max-h-80 space-y-2 overflow-y-auto">
+          {allCaps.length === 0 && (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              No capabilities available. Start the server to seed builtins.
+            </p>
+          )}
+          {allCaps.map((cap) => {
+            const assigned = assignedIds.has(cap.id)
+            return (
+              <div
+                key={cap.id}
+                className={`flex items-center justify-between rounded-md border p-3 transition-colors ${
+                  assigned ? 'border-primary/40 bg-primary/5' : 'border-border'
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">{cap.display_name}</p>
+                    <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-medium', typeAccent[cap.type] ?? 'bg-muted text-muted-foreground')}>
+                      {cap.type}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-1">{cap.description}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant={assigned ? 'destructive' : 'outline'}
+                  onClick={() => toggle(cap.id, assigned)}
+                  disabled={isPending}
+                  className="ml-3 shrink-0"
+                >
+                  {assigned ? 'Remove' : 'Add'}
+                </Button>
+              </div>
+            )
+          })}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function AgentCard({ agent, onDelete }: { agent: Agent; onDelete: () => void }) {
   const isOrchestrator = agent.role === 'orchestrator'
   const accentBar = agent.status === 'error'
@@ -354,6 +451,7 @@ function AgentCard({ agent, onDelete }: { agent: Agent; onDelete: () => void }) 
             )}
           </div>
           <div className="flex shrink-0 items-center gap-0.5">
+            <ManageCapabilitiesDialog agent={agent} />
             <ManageSkillsDialog agent={agent} />
             <EditAgentDialog agent={agent} />
             <Button

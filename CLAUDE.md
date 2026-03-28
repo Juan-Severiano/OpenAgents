@@ -130,9 +130,26 @@ Events flow: `core/event_bus.py` → Redis Pub/Sub → `api/ws.py` → browser W
 
 **Phase 1 complete** — Foundation/MVP: all models, schemas, CRUD APIs, LLM adapters, Celery boilerplate, full frontend scaffold with stores and pages.
 
-**Phase 2 in progress** — Orchestrator, AgentRunner, EventBus, task execution pipeline, WebSocket real-time canvas updates. Celery task placeholders are in `backend/app/workers/agent_tasks.py`.
+**Phase 2 complete** — Orchestrator, AgentRunner, EventBus, task execution pipeline, WebSocket real-time canvas updates fully working.
 
-Upcoming phases (per SPEC.md §12): Skills engine → Capabilities engine → MCP protocol → pgvector memory → Polish.
+**Phase 3 complete** — Skills Engine: base interface, registry, builtin skills (web_search, code_executor, http_request, file_reader, calculator, datetime_info), custom_python sandbox, custom_http, frontend Skills Library + agent skill assignment.
+
+**Phase 4 in progress** — Capabilities Engine: pre/post hooks pipeline in AgentRunner. Branch: `feat/capabilities-engine`. Issues: #25–#29.
+- Capabilities are automatic hooks (NOT tool calls) — they modify context before/after LLM calls
+- Pipeline: `apply_pre_capabilities` → `LLM.complete()` → `apply_post_capabilities`
+- Builtins: `chain_of_thought`, `short_term_summary`, `structured_output`, `self_critique`
+- `app/capabilities/base.py` — Capability ABC
+- `app/capabilities/registry.py` — CapabilityRegistry singleton
+- `app/capabilities/builtin/` — builtin implementations
+- `app/capabilities/loader.py` — seeds DB on startup
+
+**GitHub Skills** — Skills can be installed from GitHub repos. The repo must contain:
+- `skill.json` — manifest: `{name, display_name, description, input_schema, entrypoint?}`
+- `skill.py` (or custom entrypoint) — Python script-style implementation (same RestrictedPython sandbox as `custom_python`)
+
+Install endpoint: `POST /api/v1/skills/install/github` with `{url, subdir?, token?}`. Stored as `type=custom_python, source=github` with `github_url` + `github_ref` (commit SHA) columns.
+
+Upcoming phases: MCP protocol → pgvector memory → Polish.
 
 ---
 

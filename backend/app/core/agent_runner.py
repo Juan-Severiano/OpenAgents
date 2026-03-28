@@ -1,27 +1,85 @@
 """AgentRunner — executes a single specialist agent on an instruction.
 
-Agentic loop (Phase 3):
-  1. Load Agent + assigned skills from DB
+Agentic loop (Phase 3 + 4):
+  1. Load Agent + assigned skills + capabilities from DB
   2. Build LLMTool list from enabled skills via SkillRegistry
-  3. Call LLM with tools
-  4. If response.tool_calls → execute each skill, append tool result messages, loop
-  5. If no tool_calls or max_iterations reached → final response
-  6. Persist all Messages to DB, publish events
+  3. apply_pre_capabilities(agent, context)  ← Phase 4
+  4. Call LLM with tools
+  5. If response.tool_calls → execute each skill, append tool result messages, loop
+  6. If no tool_calls or max_iterations reached → final response
+  7. apply_post_capabilities(agent, context, response)  ← Phase 4
+  8. Persist all Messages to DB, publish events
 """
 
 from __future__ import annotations
 
 import json
+
 import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core import event_bus
 from app.core.context import AgentContext
-from app.llm.base import LLMMessage, LLMTool, LLMToolCall
+from app.llm.base import LLMMessage, LLMTool
 from app.llm.factory import get_provider
 
 log = structlog.get_logger(__name__)
+
+
+async def _apply_pre_capabilities(
+    agent: object, context: "AgentContext", llm: object
+) -> "AgentContext":
+    """Run all enabled pre-process capabilities for the agent."""
+    from app.capabilities.registry import registry as cap_registry
+
+    context.metadata["llm"] = llm
+    for agent_cap in getattr(agent, "capabilities", []):
+        if not agent_cap.enabled:
+            continue
+        cap_obj = getattr(agent_cap, "capability", None)
+        if cap_obj is None:
+            continue
+        cap_runner = cap_registry.get(cap_obj.name)
+        if cap_runner is None:
+            continue
+        config = agent_cap.config or {}
+        context = await cap_runner.pre_process(context, config)
+        await _publish_capability_event(context, cap_obj.name, "pre")
+    return context
+
+
+async def _apply_post_capabilities(
+    agent: object, context: "AgentContext", response: object, llm: object
+) -> object:
+    """Run all enabled post-process capabilities for the agent."""
+    from app.capabilities.registry import registry as cap_registry
+
+    context.metadata["llm"] = llm
+    for agent_cap in getattr(agent, "capabilities", []):
+        if not agent_cap.enabled:
+            continue
+        cap_obj = getattr(agent_cap, "capability", None)
+        if cap_obj is None:
+            continue
+        cap_runner = cap_registry.get(cap_obj.name)
+        if cap_runner is None:
+            continue
+        config = agent_cap.config or {}
+        response = await cap_runner.post_process(context, response, config)  # type: ignore[arg-type]
+        await _publish_capability_event(context, cap_obj.name, "post")
+    return response
+
+
+async def _publish_capability_event(context: "AgentContext", cap_name: str, stage: str) -> None:
+    from app.core import event_bus
+
+    await event_bus.publish(
+        "agent.capability_applied",
+        task_id=context.task_id,
+        agent_id=context.agent_id,
+        payload={"capability_name": cap_name, "stage": stage},
+    )
 
 
 async def _build_tools(agent: object) -> list[LLMTool]:
@@ -63,13 +121,14 @@ class AgentRunner:
         from app.skills.registry import registry
 
         async with AsyncSessionLocal() as session:
+            from app.models.agent import AgentCapability, AgentSkill
+
             result = await session.execute(
                 select(Agent)
                 .options(
                     selectinload(Agent.llm_config),
-                    selectinload(Agent.skills).selectinload(
-                        __import__("app.models.agent", fromlist=["AgentSkill"]).AgentSkill.skill
-                    ),
+                    selectinload(Agent.skills).selectinload(AgentSkill.skill),
+                    selectinload(Agent.capabilities).selectinload(AgentCapability.capability),
                 )
                 .where(Agent.id == self.agent_id)
             )
@@ -91,6 +150,10 @@ class AgentRunner:
             )
 
             tools = await _build_tools(agent)
+            llm = get_provider(agent.llm_config)
+
+            # ── Pre-capabilities ───────────────────────────────────────────
+            ctx = await _apply_pre_capabilities(agent, ctx, llm)
 
             # Mark agent as busy
             agent.status = "busy"
@@ -107,8 +170,6 @@ class AgentRunner:
                 agent_id=self.agent_id,
                 payload={"prompt_preview": self.instruction[:120]},
             )
-
-            llm = get_provider(agent.llm_config)
             messages_to_save: list[Message] = []
             final_content = ""
             total_tokens = 0
@@ -211,7 +272,7 @@ class AgentRunner:
                     "agent.thinking",
                     task_id=self.task_id,
                     agent_id=self.agent_id,
-                    payload={"prompt_preview": f"Processing tool results (iteration {iteration + 1})"},
+                    payload={"prompt_preview": f"Processing tool results (iter {iteration + 1})"},
                 )
 
             else:
@@ -219,7 +280,26 @@ class AgentRunner:
                 final_content = f"[max_iterations={agent.max_iterations} reached] {final_content}"
                 log.warning("agent_runner.max_iterations", agent_id=self.agent_id)
 
+            # ── Post-capabilities ──────────────────────────────────────────
+            # Wrap final_content into an LLMResponse for the post pipeline
+            from app.llm.base import LLMResponse as _LLMResponse
+
+            _final_resp = _LLMResponse(
+                content=final_content,
+                input_tokens=total_tokens,
+                output_tokens=0,
+                model=agent.llm_config.model,
+                raw={},
+            )
+            _final_resp = await _apply_post_capabilities(agent, ctx, _final_resp, llm)
+            final_content = _final_resp.content
+            total_tokens = _final_resp.input_tokens  # updated if post-caps made extra LLM calls
+
             # ── Persist and wrap up ───────────────────────────────────────
+            # Update last assistant message if post-capabilities changed the content
+            if messages_to_save and messages_to_save[-1].role == "assistant":
+                messages_to_save[-1].content = final_content
+
             for msg in messages_to_save:
                 session.add(msg)
 
