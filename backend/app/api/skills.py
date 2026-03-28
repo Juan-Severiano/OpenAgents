@@ -68,13 +68,51 @@ async def delete_skill(skill_id: str, db: AsyncSession = Depends(get_db)) -> Non
 async def test_skill(
     skill_id: str, body: SkillTestRequest, db: AsyncSession = Depends(get_db)
 ) -> dict:
+    import time
+
     skill = await db.get(Skill, skill_id)
     if not skill:
         raise HTTPException(status_code=404, detail=f"Skill {skill_id} not found")
-    # Placeholder — full execution engine in Phase 3
+
+    start = time.perf_counter()
+
+    if skill.type == "builtin":
+        from app.skills.registry import registry
+        runner = registry.get(skill.name)
+        if not runner:
+            raise HTTPException(status_code=500, detail=f"Builtin skill '{skill.name}' not found in registry")
+        result = await runner.run(body.input)
+
+    elif skill.type == "custom_python":
+        if not skill.implementation:
+            raise HTTPException(status_code=400, detail="Skill has no implementation code")
+        from app.skills.registry import registry
+        runner = registry.get("code_executor")
+        if not runner:
+            raise HTTPException(status_code=500, detail="code_executor not available")
+        result = await runner.run({"code": skill.implementation, "timeout": 15})
+
+    elif skill.type == "custom_http":
+        if not skill.http_config:
+            raise HTTPException(status_code=400, detail="Skill has no http_config")
+        from app.skills.registry import registry
+        runner = registry.get("http_request")
+        if not runner:
+            raise HTTPException(status_code=500, detail="http_request not available")
+        cfg = dict(skill.http_config)
+        cfg.update({k: v for k, v in body.input.items() if v is not None})
+        result = await runner.run(cfg)
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Cannot test skill of type '{skill.type}' directly")
+
+    elapsed_ms = round((time.perf_counter() - start) * 1000, 2)
     return {
         "skill_id": skill_id,
         "name": skill.name,
-        "input": body.input,
-        "result": "Skill test execution not yet implemented (Phase 3)",
+        "success": result.success,
+        "result": result.result,
+        "error": result.error,
+        "metadata": result.metadata,
+        "execution_time_ms": elapsed_ms,
     }

@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Loader2, Plus, X } from 'lucide-react'
 
-import { tasksApi, type Task } from '../api/tasks'
+import { tasksApi, type Task, type TaskCreate } from '../api/tasks'
 import { agentsApi } from '../api/agents'
 import { useTaskSocket } from '../hooks/useTaskSocket'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import {
   Dialog,
@@ -26,16 +25,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select'
-import type { TaskCreate } from '../api/tasks'
+import { cn } from '../lib/utils'
 
-const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
+const statusAccent: Record<string, string> = {
+  pending: 'bg-muted-foreground/30',
+  running: 'bg-primary',
+  completed: 'bg-green-500',
+  failed: 'bg-destructive',
+}
+
+const statusBadge: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   pending: 'secondary',
   running: 'default',
   completed: 'outline',
   failed: 'destructive',
 }
 
-// ── Create task dialog ────────────────────────────────────────────────────────
+const roleColor: Record<string, string> = {
+  user: 'text-blue-400',
+  assistant: 'text-green-400',
+  system: 'text-yellow-400',
+  tool: 'text-purple-400',
+}
 
 function CreateTaskDialog() {
   const [open, setOpen] = useState(false)
@@ -115,10 +126,7 @@ function CreateTaskDialog() {
             </Select>
           </div>
           <DialogFooter>
-            <Button
-              type="submit"
-              disabled={mutation.isPending || !form.orchestrator_id}
-            >
+            <Button type="submit" disabled={mutation.isPending || !form.orchestrator_id}>
               {mutation.isPending ? 'Creating...' : 'Create & Enqueue'}
             </Button>
           </DialogFooter>
@@ -128,22 +136,12 @@ function CreateTaskDialog() {
   )
 }
 
-// ── Task detail panel ─────────────────────────────────────────────────────────
-
-const roleColor: Record<string, string> = {
-  user: 'text-blue-400',
-  assistant: 'text-green-400',
-  system: 'text-yellow-400',
-  tool: 'text-purple-400',
-}
-
 function TaskDetail({ task }: { task: Task }) {
   const qc = useQueryClient()
   const { lastEvent } = useTaskSocket(
     task.status === 'pending' || task.status === 'running' ? task.id : null
   )
 
-  // Refresh task data when we receive a terminal event
   useEffect(() => {
     if (!lastEvent) return
     if (['task.completed', 'task.failed', 'task.started'].includes(lastEvent.type)) {
@@ -167,55 +165,53 @@ function TaskDetail({ task }: { task: Task }) {
   })
 
   return (
-    <div className="mt-4 space-y-3 border-t border-border pt-4">
-      {/* Live event banner */}
+    <div className="mt-3 space-y-3 border-t border-border pt-3">
       {lastEvent && task.status === 'running' && (
-        <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          <span className="font-mono">{lastEvent.type}</span>
+        <div className="flex items-center gap-2 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin text-primary" />
+          <span className="font-mono text-primary/70">{lastEvent.type}</span>
           {lastEvent.payload?.prompt_preview && (
-            <span className="truncate opacity-70">
-              — {String(lastEvent.payload.prompt_preview)}
-            </span>
+            <span className="truncate opacity-60">— {String(lastEvent.payload.prompt_preview)}</span>
           )}
         </div>
       )}
 
-      {/* Result */}
       {task.result && (
-        <div className="rounded-md bg-green-950/30 p-3">
-          <p className="mb-1 text-xs font-semibold text-green-400">Result</p>
-          <p className="whitespace-pre-wrap text-xs text-foreground">{task.result}</p>
+        <div className="overflow-hidden rounded-lg border border-green-500/20 bg-green-500/5">
+          <div className="border-b border-green-500/20 px-3 py-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-green-600 dark:text-green-400">Result</p>
+          </div>
+          <p className="p-3 whitespace-pre-wrap text-xs">{task.result}</p>
         </div>
       )}
 
-      {/* Error */}
       {task.error && (
-        <div className="rounded-md bg-red-950/30 p-3">
-          <p className="mb-1 text-xs font-semibold text-red-400">Error</p>
-          <p className="text-xs text-foreground">{task.error}</p>
+        <div className="overflow-hidden rounded-lg border border-destructive/20 bg-destructive/5">
+          <div className="border-b border-destructive/20 px-3 py-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-destructive">Error</p>
+          </div>
+          <p className="p-3 text-xs">{task.error}</p>
         </div>
       )}
 
-      {/* Message log */}
       {messages.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-muted-foreground">
-            Message log ({messages.length})
-          </p>
-          <div className="max-h-64 space-y-2 overflow-y-auto">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Log ({messages.length})
+            </span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <div className="max-h-56 space-y-1.5 overflow-y-auto">
             {messages.map((msg) => (
-              <div key={msg.id} className="rounded-md bg-muted/40 p-2">
+              <div key={msg.id} className="rounded-lg bg-muted/40 px-3 py-2">
                 <div className="mb-1 flex items-center gap-2">
-                  <span
-                    className={`text-xs font-semibold uppercase ${roleColor[msg.role] ?? 'text-muted-foreground'}`}
-                  >
+                  <span className={cn('text-[10px] font-bold uppercase tracking-wide', roleColor[msg.role] ?? 'text-muted-foreground')}>
                     {msg.role}
                   </span>
                   {msg.tokens_used && (
-                    <span className="text-xs text-muted-foreground">
-                      {msg.tokens_used} tokens
-                    </span>
+                    <span className="text-[10px] text-muted-foreground">{msg.tokens_used}t</span>
                   )}
                 </div>
                 <p className="line-clamp-4 whitespace-pre-wrap text-xs">{msg.content}</p>
@@ -225,14 +221,8 @@ function TaskDetail({ task }: { task: Task }) {
         </div>
       )}
 
-      {/* Cancel button */}
       {(task.status === 'pending' || task.status === 'running') && (
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => cancelMutation.mutate()}
-          disabled={cancelMutation.isPending}
-        >
+        <Button size="sm" variant="destructive" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
           <X className="mr-2 h-3 w-3" />
           {cancelMutation.isPending ? 'Cancelling...' : 'Cancel Task'}
         </Button>
@@ -241,47 +231,44 @@ function TaskDetail({ task }: { task: Task }) {
   )
 }
 
-// ── Task card ─────────────────────────────────────────────────────────────────
-
 function TaskCard({ task }: { task: Task }) {
   const [expanded, setExpanded] = useState(false)
   const isActive = task.status === 'pending' || task.status === 'running'
 
   return (
-    <Card className={isActive ? 'border-primary/40' : ''}>
-      <CardHeader className="pb-2">
-        <div
-          className="flex cursor-pointer items-center justify-between"
-          onClick={() => setExpanded((v) => !v)}
-        >
-          <div className="flex items-center gap-2">
-            {expanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )}
-            <CardTitle className="text-base">{task.title}</CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            {task.status === 'running' && (
-              <Loader2 className="h-3 w-3 animate-spin text-primary" />
-            )}
-            <Badge variant={statusVariant[task.status] ?? 'outline'}>{task.status}</Badge>
-          </div>
+    <div className={cn('overflow-hidden rounded-xl border bg-card transition-colors', isActive ? 'border-primary/30' : 'border-border')}>
+      <div
+        className="flex cursor-pointer items-start gap-3 p-4"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <div className="mt-0.5 shrink-0 text-muted-foreground">
+          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {new Date(task.created_at).toLocaleString()}
-        </p>
-        {expanded && <TaskDetail task={task} />}
-      </CardContent>
-    </Card>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-semibold leading-tight">{task.title}</p>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {task.status === 'running' && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+              <Badge variant={statusBadge[task.status] ?? 'outline'} className="text-[10px]">
+                {task.status}
+              </Badge>
+            </div>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground line-clamp-1">{task.description}</p>
+          <p className="mt-1 text-[10px] text-muted-foreground/60">
+            {new Date(task.created_at).toLocaleString()}
+          </p>
+        </div>
+      </div>
+      {expanded && (
+        <div className="px-4 pb-4">
+          <TaskDetail task={task} />
+        </div>
+      )}
+      <div className={cn('h-1', statusAccent[task.status] ?? 'bg-muted')} />
+    </div>
   )
 }
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export function TasksPage() {
   const { data: tasks = [], isLoading } = useQuery({
@@ -294,25 +281,45 @@ export function TasksPage() {
   const done = tasks.filter((t) => t.status === 'completed' || t.status === 'failed')
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Tasks</h1>
-          <p className="text-sm text-muted-foreground">
-            {pending.length} active · {done.length} completed
-          </p>
-        </div>
+    <div>
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <span className="text-xs text-muted-foreground">
+          {pending.length} active · {done.length} done
+        </span>
         <CreateTaskDialog />
       </div>
 
-      {isLoading && <p className="text-muted-foreground">Loading...</p>}
+      <div className="p-4 space-y-5">
+        {isLoading && <p className="py-8 text-center text-sm text-muted-foreground">Loading...</p>}
 
-      <div className="space-y-3">
-        {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
-        ))}
+        {pending.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Active</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="space-y-2">
+              {pending.map((task) => <TaskCard key={task.id} task={task} />)}
+            </div>
+          </section>
+        )}
+
+        {done.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">History</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="space-y-2">
+              {done.map((task) => <TaskCard key={task.id} task={task} />)}
+            </div>
+          </section>
+        )}
+
         {!isLoading && tasks.length === 0 && (
-          <p className="py-12 text-center text-muted-foreground">
+          <p className="py-12 text-center text-sm text-muted-foreground">
             No tasks yet. Create one to get started.
           </p>
         )}

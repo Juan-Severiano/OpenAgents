@@ -7,6 +7,13 @@ from app.workers.celery_app import celery_app
 log = structlog.get_logger(__name__)
 
 
+async def _dispose_engine() -> None:
+    """Close all asyncpg connections so asyncio.run() can exit cleanly in a forked process."""
+    from app.database import engine
+
+    await engine.dispose()
+
+
 @celery_app.task(
     bind=True,
     name="app.workers.agent_tasks.run_task",
@@ -20,23 +27,30 @@ def run_task(self: object, task_id: str) -> dict:
     async def _execute() -> dict:
         from app.core.orchestrator import OrchestratorAgent
 
-        return await OrchestratorAgent(task_id).run()
+        try:
+            return await OrchestratorAgent(task_id).run()
+        finally:
+            await _dispose_engine()
 
     try:
         return asyncio.run(_execute())
     except Exception as exc:
         log.error("celery.run_task.error", task_id=task_id, error=str(exc))
-        # Mark task failed in DB so the UI reflects the error
+        error_msg = str(exc)
+
         async def _mark_failed() -> None:
             from app.database import AsyncSessionLocal
             from app.models.task import Task
 
-            async with AsyncSessionLocal() as session:
-                task = await session.get(Task, task_id)
-                if task and task.status not in ("completed", "failed"):
-                    task.status = "failed"
-                    task.error = str(exc)
-                    await session.commit()
+            try:
+                async with AsyncSessionLocal() as session:
+                    task = await session.get(Task, task_id)
+                    if task and task.status not in ("completed", "failed"):
+                        task.status = "failed"
+                        task.error = error_msg
+                        await session.commit()
+            finally:
+                await _dispose_engine()
 
         asyncio.run(_mark_failed())
         raise
@@ -60,7 +74,10 @@ def run_agent_task(self: object, agent_id: str, task_id: str, instruction: str) 
     async def _execute() -> dict:
         from app.core.agent_runner import AgentRunner
 
-        return await AgentRunner(agent_id, task_id, instruction).run()
+        try:
+            return await AgentRunner(agent_id, task_id, instruction).run()
+        finally:
+            await _dispose_engine()
 
     try:
         return asyncio.run(_execute())

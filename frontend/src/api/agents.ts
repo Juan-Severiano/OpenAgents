@@ -35,9 +35,17 @@ export interface Message {
   created_at: string
 }
 
+export interface AgentSkill {
+  agent_id: string
+  skill_id: string
+  enabled: boolean
+  priority: number
+}
+
 export const agentsApi = {
   list: () => api.get<Agent[]>('/agents'),
   get: (id: string) => api.get<Agent>(`/agents/${id}`),
+  listSkills: (id: string) => api.get<AgentSkill[]>(`/agents/${id}/skills`),
   create: (data: AgentCreate) => api.post<Agent>('/agents', data),
   update: (id: string, data: Partial<AgentCreate>) => api.put<Agent>(`/agents/${id}`, data),
   delete: (id: string) => api.delete(`/agents/${id}`),
