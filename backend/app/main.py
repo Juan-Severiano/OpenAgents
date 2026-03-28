@@ -40,12 +40,12 @@ def create_app() -> FastAPI:
     )
 
     # Include routers
-    from app.api.providers import router as providers_router
     from app.api.agents import router as agents_router
-    from app.api.tasks import router as tasks_router
-    from app.api.skills import router as skills_router
     from app.api.capabilities import router as capabilities_router
     from app.api.mcp_servers import router as mcp_servers_router
+    from app.api.providers import router as providers_router
+    from app.api.skills import router as skills_router
+    from app.api.tasks import router as tasks_router
     from app.api.ws import router as ws_router
 
     prefix = "/api/v1"

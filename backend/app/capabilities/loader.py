@@ -93,9 +93,10 @@ def register_builtins() -> None:
 
 async def seed_builtin_capabilities() -> None:
     """Upsert builtin capability records in the DB. Safe to call on every startup."""
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models.capability import Capability
-    from sqlalchemy import select
 
     async with AsyncSessionLocal() as session:
         for meta in _BUILTIN_METADATA:

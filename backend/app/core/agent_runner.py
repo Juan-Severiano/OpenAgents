@@ -14,13 +14,14 @@ Agentic loop (Phase 3 + 4):
 from __future__ import annotations
 
 import json
+
 import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core import event_bus
 from app.core.context import AgentContext
-from app.llm.base import LLMMessage, LLMTool, LLMToolCall
+from app.llm.base import LLMMessage, LLMTool
 from app.llm.factory import get_provider
 
 log = structlog.get_logger(__name__)
@@ -271,7 +272,7 @@ class AgentRunner:
                     "agent.thinking",
                     task_id=self.task_id,
                     agent_id=self.agent_id,
-                    payload={"prompt_preview": f"Processing tool results (iteration {iteration + 1})"},
+                    payload={"prompt_preview": f"Processing tool results (iter {iteration + 1})"},
                 )
 
             else:
