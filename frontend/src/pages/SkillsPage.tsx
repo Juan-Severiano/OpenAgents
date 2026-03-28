@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Pencil, Play, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, ExternalLink, Github, Pencil, Play, Plus, Trash2 } from 'lucide-react'
 
-import { skillsApi, type Skill, type SkillCreate } from '../api/skills'
+import { skillsApi, type GitHubInstallRequest, type Skill, type SkillCreate } from '../api/skills'
 import { Button } from '../components/ui/button'
 import {
   Dialog,
@@ -29,6 +29,7 @@ const typeAccent: Record<string, string> = {
   custom_python: 'bg-blue-500',
   custom_http: 'bg-violet-500',
   mcp_tool: 'bg-cyan-500',
+  github: 'bg-neutral-600',
 }
 
 const EMPTY_FORM: SkillCreate = {
@@ -174,6 +175,88 @@ function SkillFormDialog({
   )
 }
 
+function GitHubInstallDialog({ trigger }: { trigger: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState<GitHubInstallRequest>({ url: '', subdir: '', token: '' })
+  const [error, setError] = useState('')
+
+  const qc = useQueryClient()
+
+  const mutation = useMutation({
+    mutationFn: (data: GitHubInstallRequest) =>
+      skillsApi.installFromGithub({
+        url: data.url,
+        subdir: data.subdir || undefined,
+        token: data.token || undefined,
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['skills'] })
+      setOpen(false)
+      setForm({ url: '', subdir: '', token: '' })
+      setError('')
+    },
+    onError: (err: Error) => setError(err.message),
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (!form.url.trim()) return
+    mutation.mutate(form)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Github className="h-4 w-4" />
+            Install Skill from GitHub
+          </DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1">
+            <Label>Repository URL</Label>
+            <Input
+              value={form.url}
+              onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
+              placeholder="https://github.com/owner/repo"
+              required
+            />
+            <p className="text-[11px] text-muted-foreground">
+              The repo must contain a <code className="font-mono">skill.json</code> manifest and a Python entrypoint.
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label>Subdirectory <span className="text-muted-foreground">(optional)</span></Label>
+            <Input
+              value={form.subdir}
+              onChange={(e) => setForm((f) => ({ ...f, subdir: e.target.value }))}
+              placeholder="skills/my_skill"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>GitHub Token <span className="text-muted-foreground">(optional, for private repos)</span></Label>
+            <Input
+              type="password"
+              value={form.token}
+              onChange={(e) => setForm((f) => ({ ...f, token: e.target.value }))}
+              placeholder="ghp_..."
+            />
+          </div>
+          {error && <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? 'Installing...' : 'Install Skill'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function TestPanel({ skill }: { skill: Skill }) {
   const [inputJson, setInputJson] = useState('{}')
   const [testResult, setTestResult] = useState<Record<string, unknown> | null>(null)
@@ -227,6 +310,7 @@ function SkillCard({ skill }: { skill: Skill }) {
   const [expanded, setExpanded] = useState(false)
   const qc = useQueryClient()
   const isUserDefined = skill.source === 'user_defined'
+  const isGithub = skill.source === 'github'
 
   const deleteMutation = useMutation({
     mutationFn: () => skillsApi.delete(skill.id),
@@ -244,6 +328,8 @@ function SkillCard({ skill }: { skill: Skill }) {
     is_public: skill.is_public,
   }
 
+  const accentKey = isGithub ? 'github' : skill.type
+
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/30">
       <div className="p-4">
@@ -258,13 +344,26 @@ function SkillCard({ skill }: { skill: Skill }) {
               <p className="font-mono text-[10px] text-muted-foreground">{skill.name}</p>
             </div>
           </div>
-          {isUserDefined && (
-            <div className="flex shrink-0 items-center gap-0.5">
+          <div className="flex shrink-0 items-center gap-0.5">
+            {isGithub && skill.github_url && (
+              <a
+                href={skill.github_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+                title={skill.github_ref ? `Commit: ${skill.github_ref.slice(0, 7)}` : 'View on GitHub'}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
+            {isUserDefined && (
               <SkillFormDialog
                 trigger={<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"><Pencil className="h-4 w-4" /></Button>}
                 initial={editForm}
                 skillId={skill.id}
               />
+            )}
+            {(isUserDefined || isGithub) && (
               <Button
                 variant="ghost" size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
@@ -273,13 +372,18 @@ function SkillCard({ skill }: { skill: Skill }) {
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
         <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{skill.description}</p>
+        {isGithub && skill.github_ref && (
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground/60">
+            {skill.github_ref.slice(0, 7)}
+          </p>
+        )}
         {expanded && <TestPanel skill={skill} />}
       </div>
-      <div className={cn('h-1', typeAccent[skill.type] ?? 'bg-muted')} />
+      <div className={cn('h-1', typeAccent[accentKey] ?? 'bg-muted')} />
     </div>
   )
 }
@@ -291,17 +395,27 @@ export function SkillsPage() {
   })
 
   const builtin = skills.filter((s) => s.source === 'builtin')
+  const github = skills.filter((s) => s.source === 'github')
   const custom = skills.filter((s) => s.source === 'user_defined')
 
   return (
     <div>
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
         <span className="text-xs text-muted-foreground">
-          {builtin.length} builtin · {custom.length} custom
+          {builtin.length} builtin · {github.length} github · {custom.length} custom
         </span>
-        <SkillFormDialog
-          trigger={<Button size="sm"><Plus className="mr-2 h-4 w-4" /> New Skill</Button>}
-        />
+        <div className="flex items-center gap-2">
+          <GitHubInstallDialog
+            trigger={
+              <Button size="sm" variant="outline">
+                <Github className="mr-2 h-4 w-4" /> Install from GitHub
+              </Button>
+            }
+          />
+          <SkillFormDialog
+            trigger={<Button size="sm"><Plus className="mr-2 h-4 w-4" /> New Skill</Button>}
+          />
+        </div>
       </div>
 
       <div className="p-4 space-y-5">
@@ -316,6 +430,19 @@ export function SkillsPage() {
             </div>
             <div className="space-y-2">
               {builtin.map((skill) => <SkillCard key={skill.id} skill={skill} />)}
+            </div>
+          </section>
+        )}
+
+        {github.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">GitHub</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="space-y-2">
+              {github.map((skill) => <SkillCard key={skill.id} skill={skill} />)}
             </div>
           </section>
         )}

@@ -9,7 +9,7 @@ from app.database import Base
 SkillTypeEnum = Enum(
     "builtin", "custom_python", "custom_http", "mcp_tool", name="skill_type_enum"
 )
-SkillSourceEnum = Enum("builtin", "user_defined", "marketplace", name="skill_source_enum")
+SkillSourceEnum = Enum("builtin", "user_defined", "marketplace", "github", name="skill_source_enum")
 
 
 class Skill(Base):
@@ -25,6 +25,8 @@ class Skill(Base):
     output_schema: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     implementation: Mapped[str | None] = mapped_column(Text, nullable=True)
     http_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    github_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    github_ref: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

@@ -143,6 +143,12 @@ Events flow: `core/event_bus.py` → Redis Pub/Sub → `api/ws.py` → browser W
 - `app/capabilities/builtin/` — builtin implementations
 - `app/capabilities/loader.py` — seeds DB on startup
 
+**GitHub Skills** — Skills can be installed from GitHub repos. The repo must contain:
+- `skill.json` — manifest: `{name, display_name, description, input_schema, entrypoint?}`
+- `skill.py` (or custom entrypoint) — Python script-style implementation (same RestrictedPython sandbox as `custom_python`)
+
+Install endpoint: `POST /api/v1/skills/install/github` with `{url, subdir?, token?}`. Stored as `type=custom_python, source=github` with `github_url` + `github_ref` (commit SHA) columns.
+
 Upcoming phases: MCP protocol → pgvector memory → Polish.
 
 ---

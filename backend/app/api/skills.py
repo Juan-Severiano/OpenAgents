@@ -6,7 +6,7 @@ import structlog
 
 from app.database import get_db
 from app.models.skill import Skill
-from app.schemas.skill import SkillCreate, SkillResponse, SkillTestRequest, SkillUpdate
+from app.schemas.skill import GitHubInstallRequest, SkillCreate, SkillResponse, SkillTestRequest, SkillUpdate
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/skills", tags=["skills"])
@@ -62,6 +62,38 @@ async def delete_skill(skill_id: str, db: AsyncSession = Depends(get_db)) -> Non
     if skill.type == "builtin":
         raise HTTPException(status_code=400, detail="Cannot delete builtin skills")
     await db.delete(skill)
+
+
+@router.post("/install/github", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)
+async def install_from_github(
+    body: GitHubInstallRequest, db: AsyncSession = Depends(get_db)
+) -> Skill:
+    import httpx
+
+    from app.skills.github_importer import fetch_skill_from_github
+
+    try:
+        data = await fetch_skill_from_github(body.url, subdir=body.subdir, token=body.token)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(status_code=502, detail=f"GitHub returned {exc.response.status_code}: {exc.response.text[:200]}")
+    except httpx.RequestError as exc:
+        raise HTTPException(status_code=502, detail=f"Could not reach GitHub: {exc}")
+
+    existing = await db.execute(select(Skill).where(Skill.name == data["name"]))
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A skill named '{data['name']}' already exists. Delete it first to reinstall.",
+        )
+
+    skill = Skill(**data)
+    db.add(skill)
+    await db.flush()
+    await db.refresh(skill)
+    log.info("skill.installed_from_github", id=skill.id, name=skill.name, url=body.url)
+    return skill
 
 
 @router.post("/{skill_id}/test")
