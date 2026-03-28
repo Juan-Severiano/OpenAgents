@@ -42,10 +42,18 @@ export interface AgentSkill {
   priority: number
 }
 
+export interface AgentCapability {
+  agent_id: string
+  capability_id: string
+  enabled: boolean
+  config?: Record<string, unknown>
+}
+
 export const agentsApi = {
   list: () => api.get<Agent[]>('/agents'),
   get: (id: string) => api.get<Agent>(`/agents/${id}`),
   listSkills: (id: string) => api.get<AgentSkill[]>(`/agents/${id}/skills`),
+  listCapabilities: (id: string) => api.get<AgentCapability[]>(`/agents/${id}/capabilities`),
   create: (data: AgentCreate) => api.post<Agent>('/agents', data),
   update: (id: string, data: Partial<AgentCreate>) => api.put<Agent>(`/agents/${id}`, data),
   delete: (id: string) => api.delete(`/agents/${id}`),
