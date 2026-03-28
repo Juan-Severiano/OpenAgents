@@ -75,6 +75,10 @@ def create_app() -> FastAPI:
             await seed_builtin_skills(db)
             await db.commit()
 
+        from app.capabilities.loader import register_builtins, seed_builtin_capabilities
+        register_builtins()
+        await seed_builtin_capabilities()
+
     return app
 
 
