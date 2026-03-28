@@ -4,7 +4,6 @@ import { CheckCircle, Plus, Trash2, XCircle } from 'lucide-react'
 
 import { providersApi, type LLMProviderCreate } from '../api/providers'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import {
   Dialog,
@@ -23,6 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select'
+import { cn } from '../lib/utils'
+
+const providerAccent: Record<string, string> = {
+  anthropic: 'bg-primary',
+  openai: 'bg-green-500',
+  google: 'bg-blue-500',
+  ollama: 'bg-violet-500',
+}
 
 function AddProviderDialog() {
   const [open, setOpen] = useState(false)
@@ -71,19 +78,12 @@ function AddProviderDialog() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
             <Label>Name</Label>
-            <Input
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="My Claude Sonnet"
-              required
-            />
+            <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="My Claude Sonnet" required />
           </div>
           <div className="space-y-1">
             <Label>Provider</Label>
             <Select value={form.provider} onValueChange={handleProviderChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="anthropic">Anthropic</SelectItem>
                 <SelectItem value="openai">OpenAI</SelectItem>
@@ -95,46 +95,26 @@ function AddProviderDialog() {
           {form.provider === 'ollama' && (
             <div className="space-y-1">
               <Label>Base URL</Label>
-              <Input
-                value={form.base_url ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value, model: '' }))}
-                placeholder="http://localhost:11434"
-              />
+              <Input value={form.base_url ?? ''} onChange={(e) => setForm((f) => ({ ...f, base_url: e.target.value, model: '' }))} placeholder="http://localhost:11434" />
             </div>
           )}
           {form.provider !== 'ollama' && (
             <div className="space-y-1">
               <Label>API Key</Label>
-              <Input
-                type="password"
-                value={form.api_key ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))}
-                placeholder="sk-..."
-              />
+              <Input type="password" value={form.api_key ?? ''} onChange={(e) => setForm((f) => ({ ...f, api_key: e.target.value }))} placeholder="sk-..." />
             </div>
           )}
           <div className="space-y-1">
             <Label>Model</Label>
             {models.length > 0 ? (
               <Select value={form.model} onValueChange={(v) => setForm((f) => ({ ...f, model: v }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingModels ? 'Loading...' : 'Select model...'} />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={loadingModels ? 'Loading...' : 'Select model...'} /></SelectTrigger>
                 <SelectContent>
-                  {models.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
+                  {models.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             ) : (
-              <Input
-                value={form.model}
-                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-                placeholder={loadingModels ? 'Loading models...' : 'e.g. llama3'}
-                required
-              />
+              <Input value={form.model} onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))} placeholder={loadingModels ? 'Loading models...' : 'e.g. llama3'} required />
             )}
           </div>
           <DialogFooter>
@@ -170,66 +150,63 @@ export function SettingsPage() {
   })
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
-          <p className="text-sm text-muted-foreground">LLM Provider configurations</p>
-        </div>
+    <div>
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <span className="text-xs text-muted-foreground">
+          {providers.length} provider{providers.length !== 1 ? 's' : ''}
+        </span>
         <AddProviderDialog />
       </div>
 
-      {isLoading && <p className="text-muted-foreground">Loading...</p>}
+      <div className="p-4 space-y-2">
+        {isLoading && <p className="py-8 text-center text-sm text-muted-foreground">Loading...</p>}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {providers.map((p) => (
-          <Card key={p.id}>
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-base">{p.name}</CardTitle>
+          <div key={p.id} className="overflow-hidden rounded-xl border border-border bg-card hover:border-primary/30 transition-colors">
+            <div className="p-4">
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold leading-tight">{p.name}</p>
+                  {p.base_url && (
+                    <p className="mt-0.5 font-mono text-[10px] text-muted-foreground truncate max-w-[220px]">{p.base_url}</p>
+                  )}
+                </div>
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  variant="ghost" size="icon"
+                  className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
                   onClick={() => deleteMutation.mutate(p.id)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <Badge variant="secondary">{p.provider}</Badge>
-                <Badge variant="outline">{p.model}</Badge>
+
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <Badge variant="secondary" className="text-[10px]">{p.provider}</Badge>
+                <Badge variant="outline" className="text-[10px] font-mono">{p.model}</Badge>
               </div>
-              {p.base_url && (
-                <p className="text-xs font-mono text-muted-foreground truncate">{p.base_url}</p>
-              )}
-              <div className="flex items-center justify-between">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => testMutation.mutate(p.id)}
-                  disabled={testMutation.isPending}
-                >
+
+              <div className="flex items-center gap-3">
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => testMutation.mutate(p.id)} disabled={testMutation.isPending}>
                   Test
                 </Button>
                 {testResults[p.id] === true && (
-                  <span className="flex items-center gap-1 text-xs text-green-400">
+                  <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
                     <CheckCircle className="h-3 w-3" /> OK
                   </span>
                 )}
                 {testResults[p.id] === false && (
-                  <span className="flex items-center gap-1 text-xs text-red-400">
+                  <span className="flex items-center gap-1 text-xs text-destructive">
                     <XCircle className="h-3 w-3" /> Failed
                   </span>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className={cn('h-1', providerAccent[p.provider] ?? 'bg-primary')} />
+          </div>
         ))}
+
         {!isLoading && providers.length === 0 && (
-          <p className="col-span-3 text-center text-muted-foreground py-12">
+          <p className="py-12 text-center text-sm text-muted-foreground">
             No providers configured. Add one to get started.
           </p>
         )}

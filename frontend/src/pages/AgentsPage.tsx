@@ -6,7 +6,6 @@ import { agentsApi, type Agent, type AgentCreate } from '../api/agents'
 import { providersApi } from '../api/providers'
 import { skillsApi } from '../api/skills'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge'
 import {
   Dialog,
@@ -26,13 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select'
-
-const statusVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  idle: 'secondary',
-  busy: 'default',
-  error: 'destructive',
-  disabled: 'outline',
-}
+import { cn } from '../lib/utils'
 
 function CreateAgentDialog({ onCreated }: { onCreated: () => void }) {
   const [open, setOpen] = useState(false)
@@ -257,8 +250,6 @@ function EditAgentDialog({ agent }: { agent: Agent }) {
   )
 }
 
-// ── Manage skills dialog ──────────────────────────────────────────────────────
-
 function ManageSkillsDialog({ agent }: { agent: Agent }) {
   const [open, setOpen] = useState(false)
   const qc = useQueryClient()
@@ -288,11 +279,8 @@ function ManageSkillsDialog({ agent }: { agent: Agent }) {
   })
 
   const toggle = (skill_id: string, assigned: boolean) => {
-    if (assigned) {
-      removeMutation.mutate(skill_id)
-    } else {
-      assignMutation.mutate(skill_id)
-    }
+    if (assigned) removeMutation.mutate(skill_id)
+    else assignMutation.mutate(skill_id)
   }
 
   const isPending = assignMutation.isPending || removeMutation.isPending
@@ -345,6 +333,62 @@ function ManageSkillsDialog({ agent }: { agent: Agent }) {
   )
 }
 
+function AgentCard({ agent, onDelete }: { agent: Agent; onDelete: () => void }) {
+  const isOrchestrator = agent.role === 'orchestrator'
+  const accentBar = agent.status === 'error'
+    ? 'bg-destructive'
+    : agent.status === 'disabled'
+      ? 'bg-muted'
+      : isOrchestrator
+        ? 'bg-primary'
+        : 'bg-stone-400 dark:bg-stone-500'
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/30">
+      <div className="p-4">
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-sm leading-tight">{agent.name}</p>
+            {agent.description && (
+              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{agent.description}</p>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5">
+            <ManageSkillsDialog agent={agent} />
+            <EditAgentDialog agent={agent} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Badge
+            variant="outline"
+            className={cn(
+              'text-[10px] px-2 py-0.5',
+              isOrchestrator && 'border-primary/40 text-primary bg-primary/5'
+            )}
+          >
+            {agent.role}
+          </Badge>
+          <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
+            {agent.status}
+          </Badge>
+          <Badge variant="outline" className="text-[10px] px-2 py-0.5">
+            {agent.max_iterations} iter
+          </Badge>
+        </div>
+      </div>
+      <div className={cn('h-1', accentBar)} />
+    </div>
+  )
+}
+
 export function AgentsPage() {
   const qc = useQueryClient()
   const { data: agents = [], isLoading } = useQuery({
@@ -357,54 +401,57 @@ export function AgentsPage() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['agents'] }),
   })
 
+  const orchestrators = agents.filter((a) => a.role === 'orchestrator')
+  const specialists = agents.filter((a) => a.role === 'specialist')
+
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Agents</h1>
-          <p className="text-sm text-muted-foreground">{agents.length} agents configured</p>
-        </div>
+    <div>
+      {/* Compact action bar */}
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <span className="text-xs text-muted-foreground">
+          {agents.length} agent{agents.length !== 1 ? 's' : ''}
+        </span>
         <CreateAgentDialog onCreated={() => void qc.invalidateQueries({ queryKey: ['agents'] })} />
       </div>
 
-      {isLoading && <p className="text-muted-foreground">Loading...</p>}
+      <div className="p-4 space-y-5">
+        {isLoading && <p className="py-8 text-center text-sm text-muted-foreground">Loading...</p>}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {agents.map((agent) => (
-          <Card key={agent.id}>
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-base">{agent.name}</CardTitle>
-                <div className="flex items-center gap-1">
-                  <ManageSkillsDialog agent={agent} />
-                  <EditAgentDialog agent={agent} />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => deleteMutation.mutate(agent.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex gap-2">
-                <Badge variant={agent.role === 'orchestrator' ? 'warning' : 'secondary'}>
-                  {agent.role}
-                </Badge>
-                <Badge variant={statusVariant[agent.status] ?? 'outline'}>{agent.status}</Badge>
-              </div>
-              {agent.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2">{agent.description}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Max iterations: {agent.max_iterations}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+        {orchestrators.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Orchestrators</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="space-y-2">
+              {orchestrators.map((agent) => (
+                <AgentCard key={agent.id} agent={agent} onDelete={() => deleteMutation.mutate(agent.id)} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {specialists.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Specialists</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="space-y-2">
+              {specialists.map((agent) => (
+                <AgentCard key={agent.id} agent={agent} onDelete={() => deleteMutation.mutate(agent.id)} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!isLoading && agents.length === 0 && (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            No agents yet. Create one to get started.
+          </p>
+        )}
       </div>
     </div>
   )

@@ -4,8 +4,6 @@ import { ChevronDown, ChevronRight, Pencil, Play, Plus, Trash2 } from 'lucide-re
 
 import { skillsApi, type Skill, type SkillCreate } from '../api/skills'
 import { Button } from '../components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
-import { Badge } from '../components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -24,12 +22,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select'
+import { cn } from '../lib/utils'
 
-const typeVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
-  builtin: 'default',
-  custom_python: 'secondary',
-  custom_http: 'secondary',
-  mcp_tool: 'outline',
+const typeAccent: Record<string, string> = {
+  builtin: 'bg-primary',
+  custom_python: 'bg-blue-500',
+  custom_http: 'bg-violet-500',
+  mcp_tool: 'bg-cyan-500',
 }
 
 const EMPTY_FORM: SkillCreate = {
@@ -41,8 +40,6 @@ const EMPTY_FORM: SkillCreate = {
   input_schema: { type: 'object', properties: {} },
   is_public: false,
 }
-
-// ── Skill form dialog (create + edit) ────────────────────────────────────────
 
 function SkillFormDialog({
   trigger,
@@ -124,13 +121,8 @@ function SkillFormDialog({
           {!isEdit && (
             <div className="space-y-1">
               <Label>Type</Label>
-              <Select
-                value={form.type}
-                onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+              <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="custom_python">Custom Python</SelectItem>
                   <SelectItem value="custom_http">Custom HTTP</SelectItem>
@@ -141,18 +133,8 @@ function SkillFormDialog({
           <div className="space-y-1">
             <Label>Input Schema (JSON Schema)</Label>
             <Textarea
-              value={
-                typeof form.input_schema === 'string'
-                  ? (form.input_schema as unknown as string)
-                  : JSON.stringify(form.input_schema, null, 2)
-              }
-              onChange={(e) => {
-                setSchemaError('')
-                setForm((f) => ({
-                  ...f,
-                  input_schema: e.target.value as unknown as Record<string, unknown>,
-                }))
-              }}
+              value={typeof form.input_schema === 'string' ? (form.input_schema as unknown as string) : JSON.stringify(form.input_schema, null, 2)}
+              onChange={(e) => { setSchemaError(''); setForm((f) => ({ ...f, input_schema: e.target.value as unknown as Record<string, unknown> })) }}
               rows={4}
               className="font-mono text-xs"
             />
@@ -174,17 +156,8 @@ function SkillFormDialog({
             <div className="space-y-1">
               <Label>HTTP Config (JSON)</Label>
               <Textarea
-                value={
-                  typeof form.http_config === 'string'
-                    ? (form.http_config as unknown as string)
-                    : JSON.stringify(form.http_config ?? { url: '', method: 'GET' }, null, 2)
-                }
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    http_config: e.target.value as unknown as Record<string, unknown>,
-                  }))
-                }
+                value={typeof form.http_config === 'string' ? (form.http_config as unknown as string) : JSON.stringify(form.http_config ?? { url: '', method: 'GET' }, null, 2)}
+                onChange={(e) => setForm((f) => ({ ...f, http_config: e.target.value as unknown as Record<string, unknown> }))}
                 rows={4}
                 className="font-mono text-xs"
               />
@@ -200,8 +173,6 @@ function SkillFormDialog({
     </Dialog>
   )
 }
-
-// ── Test panel ────────────────────────────────────────────────────────────────
 
 function TestPanel({ skill }: { skill: Skill }) {
   const [inputJson, setInputJson] = useState('{}')
@@ -227,12 +198,7 @@ function TestPanel({ skill }: { skill: Skill }) {
     <div className="mt-3 space-y-2 border-t border-border pt-3">
       <div className="space-y-1">
         <Label className="text-xs">Input JSON</Label>
-        <Textarea
-          value={inputJson}
-          onChange={(e) => setInputJson(e.target.value)}
-          rows={3}
-          className="font-mono text-xs"
-        />
+        <Textarea value={inputJson} onChange={(e) => setInputJson(e.target.value)} rows={3} className="font-mono text-xs" />
         {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
       </div>
       <Button size="sm" onClick={run} disabled={mutation.isPending}>
@@ -240,11 +206,7 @@ function TestPanel({ skill }: { skill: Skill }) {
         {mutation.isPending ? 'Running...' : 'Run'}
       </Button>
       {testResult !== null && (
-        <div
-          className={`rounded-md p-2 text-xs font-mono ${
-            testResult.success ? 'bg-green-950/30 text-green-300' : 'bg-red-950/30 text-red-300'
-          }`}
-        >
+        <div className={cn('rounded-lg p-2 text-xs font-mono', testResult.success ? 'bg-green-500/10 text-green-700 dark:text-green-300' : 'bg-destructive/10 text-destructive')}>
           {testResult.error ? (
             <p>Error: {String(testResult.error)}</p>
           ) : (
@@ -253,15 +215,13 @@ function TestPanel({ skill }: { skill: Skill }) {
             </pre>
           )}
           {typeof testResult.execution_time_ms === 'number' && (
-            <p className="mt-1 text-muted-foreground">{testResult.execution_time_ms}ms</p>
+            <p className="mt-1 opacity-60">{testResult.execution_time_ms}ms</p>
           )}
         </div>
       )}
     </div>
   )
 }
-
-// ── Skill card ────────────────────────────────────────────────────────────────
 
 function SkillCard({ skill }: { skill: Skill }) {
   const [expanded, setExpanded] = useState(false)
@@ -285,34 +245,28 @@ function SkillCard({ skill }: { skill: Skill }) {
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-start justify-between">
+    <div className="overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-primary/30">
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-2">
           <div
-            className="flex cursor-pointer items-center gap-2"
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2"
             onClick={() => setExpanded((v) => !v)}
           >
-            {expanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )}
-            <CardTitle className="text-base">{skill.display_name}</CardTitle>
+            {expanded ? <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{skill.display_name}</p>
+              <p className="font-mono text-[10px] text-muted-foreground">{skill.name}</p>
+            </div>
           </div>
           {isUserDefined && (
-            <div className="flex items-center gap-1">
+            <div className="flex shrink-0 items-center gap-0.5">
               <SkillFormDialog
-                trigger={
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                }
+                trigger={<Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground"><Pencil className="h-4 w-4" /></Button>}
                 initial={editForm}
                 skillId={skill.id}
               />
               <Button
-                variant="ghost"
-                size="icon"
+                variant="ghost" size="icon"
                 className="h-7 w-7 text-muted-foreground hover:text-destructive"
                 onClick={() => deleteMutation.mutate()}
                 disabled={deleteMutation.isPending}
@@ -322,21 +276,13 @@ function SkillCard({ skill }: { skill: Skill }) {
             </div>
           )}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="flex gap-2">
-          <Badge variant={typeVariant[skill.type] ?? 'outline'}>{skill.type}</Badge>
-          <Badge variant="outline">{skill.source}</Badge>
-        </div>
-        <p className="text-xs text-muted-foreground line-clamp-2">{skill.description}</p>
-        <p className="font-mono text-xs text-muted-foreground">{skill.name}</p>
+        <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{skill.description}</p>
         {expanded && <TestPanel skill={skill} />}
-      </CardContent>
-    </Card>
+      </div>
+      <div className={cn('h-1', typeAccent[skill.type] ?? 'bg-muted')} />
+    </div>
   )
 }
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export function SkillsPage() {
   const { data: skills = [], isLoading } = useQuery({
@@ -348,56 +294,51 @@ export function SkillsPage() {
   const custom = skills.filter((s) => s.source === 'user_defined')
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Skills</h1>
-          <p className="text-sm text-muted-foreground">
-            {builtin.length} builtin · {custom.length} custom
-          </p>
-        </div>
+    <div>
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <span className="text-xs text-muted-foreground">
+          {builtin.length} builtin · {custom.length} custom
+        </span>
         <SkillFormDialog
-          trigger={
-            <Button size="sm">
-              <Plus className="mr-2 h-4 w-4" /> New Skill
-            </Button>
-          }
+          trigger={<Button size="sm"><Plus className="mr-2 h-4 w-4" /> New Skill</Button>}
         />
       </div>
 
-      {isLoading && <p className="text-muted-foreground">Loading...</p>}
+      <div className="p-4 space-y-5">
+        {isLoading && <p className="py-8 text-center text-sm text-muted-foreground">Loading...</p>}
 
-      {builtin.length > 0 && (
-        <section className="mb-6">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Builtin
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {builtin.map((skill) => (
-              <SkillCard key={skill.id} skill={skill} />
-            ))}
-          </div>
-        </section>
-      )}
+        {builtin.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Builtin</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="space-y-2">
+              {builtin.map((skill) => <SkillCard key={skill.id} skill={skill} />)}
+            </div>
+          </section>
+        )}
 
-      {custom.length > 0 && (
-        <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Custom
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {custom.map((skill) => (
-              <SkillCard key={skill.id} skill={skill} />
-            ))}
-          </div>
-        </section>
-      )}
+        {custom.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Custom</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="space-y-2">
+              {custom.map((skill) => <SkillCard key={skill.id} skill={skill} />)}
+            </div>
+          </section>
+        )}
 
-      {!isLoading && skills.length === 0 && (
-        <p className="py-12 text-center text-muted-foreground">
-          No skills yet. Start the server to seed builtin skills.
-        </p>
-      )}
+        {!isLoading && skills.length === 0 && (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            No skills yet. Start the server to seed builtin skills.
+          </p>
+        )}
+      </div>
     </div>
   )
 }
