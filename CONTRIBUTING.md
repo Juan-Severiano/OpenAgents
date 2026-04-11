@@ -113,11 +113,13 @@ git push origin feature/your-feature-name
 - Ensure existing tests pass
 - Run the test suite before submitting:
   ```bash
-  # Backend tests
-  cd backend && npm test
+  # Backend tests (Python)
+  cd backend
+  python -m pytest
   
-  # Frontend tests
-  cd frontend && npm test
+  # Frontend
+  # There is currently no automated test command configured for the frontend.
+  # Please follow the instructions in frontend/README.md to manually verify changes.
   ```
 
 ## Reporting Issues
