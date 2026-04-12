@@ -114,12 +114,13 @@ git push origin feature/your-feature-name
 - Run the test suite before submitting:
   ```bash
   # Backend tests (Python)
-  cd backend
-  python -m pytest
+  # Note: Tests directory does not exist yet. When tests are added, run:
+  # cd backend
+  # python -m pytest
   
   # Frontend
   # There is currently no automated test command configured for the frontend.
-  # Please follow the instructions in frontend/README.md to manually verify changes.
+  # Please manually verify your changes by running the dev server and testing the UI.
   ```
 
 ## Reporting Issues

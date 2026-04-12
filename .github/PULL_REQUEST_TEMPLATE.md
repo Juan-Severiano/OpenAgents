@@ -5,7 +5,7 @@
 ## Related Issues
 
 <!-- Link related issues using Fixes #123 or Closes #456 -->
-Fixes #<issue-number>
+<!-- Fixes #<issue-number> -->
 
 ## Changes Made
 
